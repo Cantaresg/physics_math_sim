@@ -329,14 +329,14 @@ tbody tr:hover td { background: var(--surface2); }
     <div class="ps">
       <div class="ps-title">Parameters</div>
       <div class="sr">
-        <span class="sr-lbl">Length (L)</span>
+        <span class="sr-lbl" id="lblLLabel">Length (L)</span>
         <input type="range" id="sliderL" min="0.10" max="1.50" step="0.01" value="0.50" oninput="updateParams()">
         <span class="sr-val" id="lblL">0.50 m</span>
       </div>
       <div class="sr">
         <span class="sr-lbl">Release angle</span>
         <input type="range" id="sliderAngle" min="2" max="85" step="1" value="15" oninput="updateParams()">
-        <span class="sr-val" id="lblAngle">15°</span>
+        <span class="sr-val" id="lblAngle" style="visibility:hidden">15°</span>
       </div>
       <div class="sr" id="tempRow" style="display:none">
         <span class="sr-lbl">Temperature</span>
@@ -523,17 +523,50 @@ function draw(){
   ctx.beginPath(); ctx.moveTo(PIVOT_X,PIVOT_Y); ctx.lineTo(PIVOT_X,PIVOT_Y+Lpx+36); ctx.stroke();
   ctx.setLineDash([]);
 
-  // String
+  // String / paperclip chain
   ctx.save();
-  ctx.strokeStyle=S.setup==='paperclip'?'#907860':'#d4b896';
-  ctx.lineWidth=S.setup==='paperclip'?1.5:2.5;
-  ctx.shadowColor='rgba(212,184,150,0.18)'; ctx.shadowBlur=5;
-  if(S.setup==='rod'&&S.theta<-0.01){
-    const ry=PIVOT_Y+S.rodPos*SCALE;
-    ctx.beginPath(); ctx.moveTo(PIVOT_X,PIVOT_Y); ctx.lineTo(PIVOT_X,ry); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(PIVOT_X,ry); ctx.lineTo(bobX,bobY); ctx.stroke();
+  if(S.setup==='paperclip'){
+    // Draw a chain of linked paperclips along the string
+    const dx=bobX-PIVOT_X, dy=bobY-PIVOT_Y;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    const ux=dx/dist, uy=dy/dist; // unit vector along string
+    const px=-uy, py=ux;          // perpendicular unit vector
+    const clipH=18, clipW=6, gap=2;
+    const step=clipH+gap;
+    const count=Math.max(1,Math.floor(dist/step));
+    ctx.strokeStyle='#9aabb8'; ctx.lineWidth=1.4;
+    ctx.shadowColor='rgba(154,171,184,0.25)'; ctx.shadowBlur=4;
+    for(let i=0;i<count;i++){
+      const t0=(i*step)/dist, t1=Math.min((i*step+clipH)/dist,1);
+      const cx0=PIVOT_X+dx*t0, cy0=PIVOT_Y+dy*t0;
+      const cx1=PIVOT_X+dx*t1, cy1=PIVOT_Y+dy*t1;
+      const mid0x=(cx0+cx1)/2, mid0y=(cy0+cy1)/2;
+      // Alternate clip orientation each link for realism
+      const side=(i%2===0)?1:-1;
+      const ox=px*clipW*side, oy=py*clipW*side;
+      // Outer loop of paperclip
+      ctx.beginPath();
+      ctx.moveTo(cx0,cy0);
+      ctx.bezierCurveTo(cx0+ox,cy0+oy, cx1+ox,cy1+oy, cx1,cy1);
+      ctx.stroke();
+      // Inner return loop
+      ctx.beginPath();
+      ctx.moveTo(cx0,cy0);
+      ctx.bezierCurveTo(cx0+ox*.4,cy0+oy*.4, mid0x+ox*.4,mid0y+oy*.4, mid0x,mid0y);
+      ctx.stroke();
+    }
+    ctx.shadowBlur=0;
   } else {
-    ctx.beginPath(); ctx.moveTo(PIVOT_X,PIVOT_Y); ctx.lineTo(bobX,bobY); ctx.stroke();
+    ctx.strokeStyle='#d4b896';
+    ctx.lineWidth=2.5;
+    ctx.shadowColor='rgba(212,184,150,0.18)'; ctx.shadowBlur=5;
+    if(S.setup==='rod'&&S.theta<-0.01){
+      const ry=PIVOT_Y+S.rodPos*SCALE;
+      ctx.beginPath(); ctx.moveTo(PIVOT_X,PIVOT_Y); ctx.lineTo(PIVOT_X,ry); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(PIVOT_X,ry); ctx.lineTo(bobX,bobY); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.moveTo(PIVOT_X,PIVOT_Y); ctx.lineTo(bobX,bobY); ctx.stroke();
+    }
   }
   ctx.restore();
 
@@ -547,7 +580,7 @@ function draw(){
 
   // Bob
   let br=20, bc='#4df0b0', bs='#28a876';
-  if(S.setup==='paperclip'){br=8; bc='#b0b8c8'; bs='#808898';}
+  if(S.setup==='paperclip'){br=10; bc='#9aabb8'; bs='#6a7e8e';}
   else if(S.setup==='heavy'){br=30; bc='#c77dff'; bs='#8850cc';}
 
   // Glow halo
@@ -563,11 +596,10 @@ function draw(){
   ctx.fillStyle=sph; ctx.shadowColor=bc+'44'; ctx.shadowBlur=18; ctx.fill();
   ctx.strokeStyle=bs; ctx.lineWidth=1.5; ctx.stroke(); ctx.shadowBlur=0;
 
-  // Paperclip detail
+  // Paperclip setup — last link connects to a small flat clasp
   if(S.setup==='paperclip'){
-    ctx.strokeStyle='#707888'; ctx.lineWidth=1.2;
-    ctx.beginPath(); ctx.arc(bobX,bobY,6,Math.PI*.1,Math.PI*1.9); ctx.stroke();
-    ctx.beginPath(); ctx.arc(bobX,bobY+2,3,Math.PI*.8,Math.PI*.2); ctx.stroke();
+    ctx.strokeStyle='#6a7e8e'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(bobX-6,bobY); ctx.lineTo(bobX+6,bobY); ctx.stroke();
   }
   // Heavy bolt detail
   if(S.setup==='heavy'){
@@ -612,15 +644,31 @@ function setSetup(s){
   document.querySelectorAll('.sc').forEach(c=>c.classList.remove('active'));
   document.getElementById('setup_'+s).classList.add('active');
   document.getElementById('rodRow').style.display=s==='rod'?'flex':'none';
+  // Relabel and rescale length slider for paperclip mode
+  const sliderL=document.getElementById('sliderL');
+  if(s==='paperclip'){
+    document.getElementById('lblLLabel').textContent='No. of clips';
+    sliderL.min=1; sliderL.max=30; sliderL.step=1; sliderL.value=10;
+  } else {
+    document.getElementById('lblLLabel').textContent='Length (L)';
+    sliderL.min=0.10; sliderL.max=1.50; sliderL.step=0.01; sliderL.value=0.50;
+  }
   resetSim();
 }
 
 function updateParams(){
-  S.L      = parseFloat(document.getElementById('sliderL').value);
+  const rawL = parseFloat(document.getElementById('sliderL').value);
+  if(S.setup==='paperclip'){
+    const clips = Math.round(rawL);
+    S.L = clips * 0.05;
+    document.getElementById('lblL').textContent = clips + ' clips';
+  } else {
+    S.L = rawL;
+    document.getElementById('lblL').textContent = S.L.toFixed(2)+' m';
+  }
   S.releaseAngle = parseFloat(document.getElementById('sliderAngle').value)*Math.PI/180;
   S.temp   = parseFloat(document.getElementById('sliderTemp').value);
   S.rodPos = parseFloat(document.getElementById('sliderRod').value);
-  document.getElementById('lblL').textContent     = S.L.toFixed(2)+' m';
   document.getElementById('lblAngle').textContent = Math.round(S.releaseAngle*180/Math.PI)+'°';
   document.getElementById('lblTemp').textContent  = S.temp+' °C';
   document.getElementById('lblRod').textContent   = S.rodPos.toFixed(2)+' m';
@@ -680,7 +728,12 @@ function toggleReveal(){
 
 // ── INFO BAR ───────────────────────────────────────────────────────────────
 function updateInfoBar(){
-  document.getElementById('infoL').textContent=S.L.toFixed(2)+' m';
+  if(S.setup==='paperclip'){
+    const clips=Math.round(S.L/0.05);
+    document.getElementById('infoL').textContent=clips+' clips ('+S.L.toFixed(2)+' m)';
+  } else {
+    document.getElementById('infoL').textContent=S.L.toFixed(2)+' m';
+  }
   if(S.oscCount>0 && S.swTime>0){
     document.getElementById('infoT').textContent=(S.swTime/S.oscCount).toFixed(3)+' s';
   } else {
