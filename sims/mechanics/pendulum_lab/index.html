@@ -420,9 +420,13 @@ function rk4(th,om,dt,L,b){
   return[th+dt/6*(k1t+2*k2t+2*k3t+k4t), om+dt/6*(k1o+2*k2o+2*k3o+k4o)];
 }
 function damping(){ if(S.mode==='ideal')return 0; const r=1.293*273.15/(273.15+S.temp); return 0.016*r/1.293; }
-function effL(){ return(S.setup==='rod'&&S.theta<-0.01)?Math.max(S.L-S.rodPos,0.05):S.L; }
-function exactPeriod(L,a0){ const k=Math.sin(a0/2); return 2*Math.PI*Math.sqrt(L/g)*(1+k*k/4+9*k*k*k*k/64); }
-function shmPeriod(L){ return 2*Math.PI*Math.sqrt(L/g); }
+function effL(){
+  if(S.setup==='paperclip') return S.L*2/3;
+  if(S.setup==='rod'&&S.theta<-0.01) return Math.max(S.L-S.rodPos,0.05);
+  return S.L;
+}
+function exactPeriod(Leff,a0){ const k=Math.sin(a0/2); return 2*Math.PI*Math.sqrt(Leff/g)*(1+k*k/4+9*k*k*k*k/64); }
+function shmPeriod(Leff){ return 2*Math.PI*Math.sqrt(Leff/g); }
 
 // ── LOOP ───────────────────────────────────────────────────────────────────
 function loop(ts){
@@ -574,40 +578,49 @@ function draw(){
   ctx.beginPath(); ctx.arc(PIVOT_X,PIVOT_Y,5,0,Math.PI*2);
   ctx.fillStyle='#4df0b0'; ctx.shadowColor='#4df0b055'; ctx.shadowBlur=12; ctx.fill(); ctx.shadowBlur=0;
 
-  // Equilibrium dot
-  ctx.beginPath(); ctx.arc(PIVOT_X,PIVOT_Y+Lpx,3,0,Math.PI*2);
-  ctx.fillStyle='rgba(255,255,255,0.1)'; ctx.fill();
-
-  // Bob
-  let br=20, bc='#4df0b0', bs='#28a876';
-  if(S.setup==='paperclip'){br=10; bc='#9aabb8'; bs='#6a7e8e';}
-  else if(S.setup==='heavy'){br=30; bc='#c77dff'; bs='#8850cc';}
-
-  // Glow halo
-  const halo=ctx.createRadialGradient(bobX,bobY,0,bobX,bobY,br*2.2);
-  halo.addColorStop(0,bc+'40'); halo.addColorStop(1,bc+'00');
-  ctx.beginPath(); ctx.arc(bobX,bobY,br*2.2,0,Math.PI*2);
-  ctx.fillStyle=halo; ctx.fill();
-
-  // Bob sphere
-  const sph=ctx.createRadialGradient(bobX-br*.28,bobY-br*.28,0,bobX,bobY,br);
-  sph.addColorStop(0,bc); sph.addColorStop(0.55,bc+'cc'); sph.addColorStop(1,bs);
-  ctx.beginPath(); ctx.arc(bobX,bobY,br,0,Math.PI*2);
-  ctx.fillStyle=sph; ctx.shadowColor=bc+'44'; ctx.shadowBlur=18; ctx.fill();
-  ctx.strokeStyle=bs; ctx.lineWidth=1.5; ctx.stroke(); ctx.shadowBlur=0;
-
-  // Paperclip setup — last link connects to a small flat clasp
-  if(S.setup==='paperclip'){
-    ctx.strokeStyle='#6a7e8e'; ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.moveTo(bobX-6,bobY); ctx.lineTo(bobX+6,bobY); ctx.stroke();
+  // Equilibrium dot (other setups only)
+  if(S.setup!=='paperclip'){
+    ctx.beginPath(); ctx.arc(PIVOT_X,PIVOT_Y+Lpx,3,0,Math.PI*2);
+    ctx.fillStyle='rgba(255,255,255,0.1)'; ctx.fill();
   }
-  // Heavy bolt detail
-  if(S.setup==='heavy'){
-    ctx.strokeStyle='#7040aa'; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.moveTo(bobX-9,bobY); ctx.lineTo(bobX+9,bobY); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(bobX,bobY-9); ctx.lineTo(bobX,bobY+9); ctx.stroke();
-    ctx.beginPath(); ctx.arc(bobX,bobY,4,0,Math.PI*2);
-    ctx.fillStyle='#c77dff88'; ctx.fill();
+
+  if(S.setup==='paperclip'){
+    // No bob — chain has distributed mass
+    // Mark centre of mass at midpoint of chain (L/2 along the chain)
+    const cmX=PIVOT_X+Math.sin(S.theta)*Lpx*0.5;
+    const cmY=PIVOT_Y+Math.cos(S.theta)*Lpx*0.5;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cmX,cmY,4,0,Math.PI*2);
+    ctx.fillStyle='rgba(77,240,176,0.35)';
+    ctx.shadowColor='#4df0b055'; ctx.shadowBlur=8; ctx.fill();
+    ctx.strokeStyle='#4df0b088'; ctx.lineWidth=1; ctx.stroke();
+    ctx.shadowBlur=0; ctx.restore();
+  } else {
+    // Bob
+    let br=20, bc='#4df0b0', bs='#28a876';
+    if(S.setup==='heavy'){br=30; bc='#c77dff'; bs='#8850cc';}
+
+    // Glow halo
+    const halo=ctx.createRadialGradient(bobX,bobY,0,bobX,bobY,br*2.2);
+    halo.addColorStop(0,bc+'40'); halo.addColorStop(1,bc+'00');
+    ctx.beginPath(); ctx.arc(bobX,bobY,br*2.2,0,Math.PI*2);
+    ctx.fillStyle=halo; ctx.fill();
+
+    // Bob sphere
+    const sph=ctx.createRadialGradient(bobX-br*.28,bobY-br*.28,0,bobX,bobY,br);
+    sph.addColorStop(0,bc); sph.addColorStop(0.55,bc+'cc'); sph.addColorStop(1,bs);
+    ctx.beginPath(); ctx.arc(bobX,bobY,br,0,Math.PI*2);
+    ctx.fillStyle=sph; ctx.shadowColor=bc+'44'; ctx.shadowBlur=18; ctx.fill();
+    ctx.strokeStyle=bs; ctx.lineWidth=1.5; ctx.stroke(); ctx.shadowBlur=0;
+
+    // Heavy bolt detail
+    if(S.setup==='heavy'){
+      ctx.strokeStyle='#7040aa'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(bobX-9,bobY); ctx.lineTo(bobX+9,bobY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(bobX,bobY-9); ctx.lineTo(bobX,bobY+9); ctx.stroke();
+      ctx.beginPath(); ctx.arc(bobX,bobY,4,0,Math.PI*2);
+      ctx.fillStyle='#c77dff88'; ctx.fill();
+    }
   }
 
   // Drag hint
@@ -730,7 +743,7 @@ function toggleReveal(){
 function updateInfoBar(){
   if(S.setup==='paperclip'){
     const clips=Math.round(S.L/0.05);
-    document.getElementById('infoL').textContent=clips+' clips ('+S.L.toFixed(2)+' m)';
+    document.getElementById('infoL').textContent=clips+' clips';
   } else {
     document.getElementById('infoL').textContent=S.L.toFixed(2)+' m';
   }
@@ -739,8 +752,9 @@ function updateInfoBar(){
   } else {
     document.getElementById('infoT').textContent='—';
   }
-  document.getElementById('infoTExact').textContent  = exactPeriod(S.L,S.releaseAngle).toFixed(3)+' s';
-  document.getElementById('infoTApprox').textContent = shmPeriod(S.L).toFixed(3)+' s';
+  const Leff=effL();
+  document.getElementById('infoTExact').textContent  = exactPeriod(Leff,S.releaseAngle).toFixed(3)+' s';
+  document.getElementById('infoTApprox').textContent = shmPeriod(Leff).toFixed(3)+' s';
 }
 
 // ── DATA ───────────────────────────────────────────────────────────────────
@@ -869,7 +883,14 @@ function tryStartDrag(mx,my){
   if(S.released)return;
   const bx=PIVOT_X+Math.sin(S.theta)*S.L*SCALE;
   const by=PIVOT_Y+Math.cos(S.theta)*S.L*SCALE;
-  if(Math.hypot(mx-bx,my-by)<52) S.dragging=true;
+  // Paperclip: no bob, so allow dragging anywhere in lower half of chain
+  if(S.setup==='paperclip'){
+    const midX=PIVOT_X+Math.sin(S.theta)*S.L*SCALE*0.5;
+    const midY=PIVOT_Y+Math.cos(S.theta)*S.L*SCALE*0.5;
+    if(Math.hypot(mx-bx,my-by)<40||Math.hypot(mx-midX,my-midY)<40) S.dragging=true;
+  } else {
+    if(Math.hypot(mx-bx,my-by)<52) S.dragging=true;
+  }
 }
 function doDrag(mx,my){
   if(!S.dragging)return;
