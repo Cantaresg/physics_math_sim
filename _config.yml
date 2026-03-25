@@ -1,0 +1,13 @@
+title: PhysicsSims Lab
+description: Interactive physics simulations for secondary and beyond
+theme: minima
+author: Your Name
+email: your@email.com
+
+nav_links:
+  - title: Home
+    url: /
+  - title: Simulations
+    url: /sims/
+  - title: About
+    url: /about/
